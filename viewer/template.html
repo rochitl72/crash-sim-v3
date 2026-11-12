@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrashLab</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#141a22; --panel2:#1a222c; --line:#26303c; --text:#e8ecf1; --muted:#93a0b0;
+  --accent:#3dd6c6; --amber:#ffb020; --red:#ff5d5d; --ok:#4ade80; --asphalt:#2a2f37;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{padding:14px 20px 0;border-bottom:1px solid var(--line);background:linear-gradient(#10161e,#0d1117)}
+.brandrow{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.brand{font-size:19px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:9px}
+.brand svg{width:22px;height:22px}
+.sub{color:var(--muted);font-size:13px}
+.badges{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-size:11px;padding:2px 8px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-family:var(--mono)}
+.stabs{display:flex;gap:4px;margin-top:12px;overflow-x:auto;scrollbar-width:thin}
+.stab{display:flex;align-items:center;gap:8px;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--muted);
+  padding:8px 14px;border-radius:8px 8px 0 0;white-space:nowrap}
+.stab .n{font-family:var(--mono);font-size:11px;width:18px;height:18px;border-radius:5px;background:var(--panel2);display:grid;place-items:center;color:var(--muted)}
+.stab:hover{color:var(--text)}
+.stab[aria-selected=true]{background:var(--bg);border-color:var(--line);color:var(--text);position:relative;top:1px}
+.stab[aria-selected=true] .n{background:var(--accent);color:#06201d}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,430px);gap:16px;padding:16px 20px 28px;max-width:1500px;margin:0 auto}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.stage{position:relative;background:#0a0e13;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:min(62vh,560px);min-height:340px}
+#cv{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#cv:active{cursor:grabbing}
+.hud{position:absolute;pointer-events:none}
+.hud.tl{left:14px;top:12px;max-width:calc(100% - 150px)}
+@media(max-width:600px){.hud.tl h1{font-size:15px}.hud.tr{font-size:12px;padding:2px 8px}.hud.tl{max-width:calc(100% - 118px)}}
+.hud.tl h1{margin:0;font-size:17px;font-weight:650;text-shadow:0 1px 6px #000}
+.hud.tl p{margin:2px 0 6px;color:#c3ccd7;font-size:12.5px;text-shadow:0 1px 5px #000}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.chip{font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(20,26,34,.82);border:1px solid var(--line);color:#c3ccd7}
+.hud.tr{right:14px;top:12px;font-family:var(--mono);font-size:13px;background:rgba(20,26,34,.85);border:1px solid var(--line);padding:3px 10px;border-radius:8px}
+.legend{position:absolute;left:12px;bottom:10px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.legend .chip{display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+.mini{position:absolute;right:12px;bottom:10px;display:flex;gap:6px}
+.mini button{background:rgba(20,26,34,.88);border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-size:12px;color:var(--muted)}
+.mini button:hover{color:var(--text);border-color:#3a4756}
+.controls{margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.crow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;height:34px;min-width:38px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:hover{border-color:#3a4756}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06201d;font-weight:650;min-width:84px}
+.scrub{position:relative;flex:1;min-width:180px;height:34px;display:flex;align-items:center}
+.scrub input{width:100%;margin:0;accent-color:var(--accent);height:24px;position:relative;z-index:2;background:transparent}
+.ticks{position:absolute;left:8px;right:8px;top:0;bottom:0;pointer-events:none;z-index:3}
+.tick{position:absolute;top:2px;width:2px;height:8px;background:var(--amber);border-radius:2px;pointer-events:auto;cursor:pointer;transform:translateX(-1px)}
+.tick:hover{height:12px}
+.tread{font-family:var(--mono);font-size:12.5px;color:var(--muted);min-width:112px;text-align:right}
+select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 8px}
+.toggles{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.tg{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:3px 11px 3px 8px;font-size:12.5px;color:var(--muted);cursor:pointer;user-select:none;background:var(--panel2)}
+.tg input{accent-color:var(--accent);margin:0}
+.tg:has(input:checked){color:var(--text);border-color:#3b6f6a}
+.story{color:#bcc6d2;margin:12px 2px 0;font-size:13.5px;max-width:78ch}
+aside.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:420px;max-height:calc(100vh - 150px);position:sticky;top:12px;align-self:start}
+@media(max-width:1000px){aside.panel{position:static;max-height:none}}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 6px}
+.tabs{overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.tabs button{background:none;border:none;border-bottom:2px solid transparent;padding:11px 10px;color:var(--muted);font-size:13px;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--text);border-bottom-color:var(--accent)}
+.tabs button:hover{color:var(--text)}
+.tabs button[hidden]{display:none}
+.pane{padding:14px;overflow:auto;flex:1}
+.pane h3{margin:16px 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.pane h3:first-child{margin-top:0}
+.pane p{margin:6px 0;color:#c3ccd7}
+.small{font-size:12px;color:var(--muted)}
+.ev{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 12px;margin-bottom:9px;cursor:pointer;width:100%;text-align:left;display:block}
+.ev:hover{border-color:#3a4756}
+.evh{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.evn{font-family:var(--mono);font-size:11px;background:var(--amber);color:#2a1a00;border-radius:5px;padding:0 6px;font-weight:700}
+.evt{font-family:var(--mono);color:var(--muted);font-size:12px}
+.evz{margin-left:auto;font-size:12px;color:#c3ccd7}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px}
+.kv span:nth-child(odd){color:var(--muted)}
+.kv b{font-family:var(--mono);font-weight:600}
+.vrow{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.vrow:last-of-type{border-bottom:none}
+.vrow .nm{font-weight:600}
+.vrow .nt{grid-column:2/5;color:var(--muted);font-size:12px;margin-top:-4px}
+.big{font-family:var(--mono);font-size:21px;font-weight:650;text-align:right;min-width:68px}
+.unit{color:var(--muted);font-size:11px;margin-left:3px;font-weight:400}
+.sm{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;min-width:78px}
+#chart{width:100%;height:170px;display:block;margin-top:6px}
+.forest{margin:6px 0 2px}
+.frow{display:grid;grid-template-columns:128px 1fr 92px;align-items:center;gap:10px;padding:5px 0}
+.fl{font-size:12.5px;color:#c3ccd7;line-height:1.25}
+.ft{position:relative;height:22px}
+.ft::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line)}
+.fb{position:absolute;top:5px;height:12px;border-radius:3px;background:rgba(61,214,198,.35);border:1px solid var(--accent)}
+.fm{position:absolute;top:6px;width:10px;height:10px;border-radius:50%;background:var(--accent);transform:translateX(-5px)}
+.fx{position:absolute;top:0;width:2px;height:22px;background:var(--amber);transform:translateX(-1px)}
+.fd{position:absolute;top:6px;width:9px;height:9px;background:var(--red);transform:translateX(-4.5px) rotate(45deg)}
+.fv{font-family:var(--mono);font-size:12px;text-align:right;line-height:1.25}
+.fv small{color:var(--muted);display:block}
+.ax{display:grid;grid-template-columns:128px 1fr 92px;gap:10px;margin-bottom:2px}
+.axl{position:relative;height:14px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.axl span{position:absolute;transform:translateX(-50%)}
+.key{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:8px 0 2px}
+.key i{display:inline-block;vertical-align:middle;margin-right:5px}
+.k-bar{width:16px;height:9px;background:rgba(61,214,198,.35);border:1px solid var(--accent);border-radius:2px}
+.k-med{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+.k-x{width:2px;height:13px;background:var(--amber)}
+.k-d{width:8px;height:8px;background:var(--red);transform:rotate(45deg)}
+#heat{width:100%;aspect-ratio:1.18;display:block;border:1px solid var(--line);border-radius:8px;background:#0a0e13}
+.verdict{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);margin:8px 0}
+.verdict .ic{font-size:16px;line-height:1.2}
+.ok{color:var(--ok)}.warn{color:var(--amber)}.bad{color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0}
+th,td{text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:11.5px}
+td.m{font-family:var(--mono);font-size:12px}
+ul.lim{margin:6px 0;padding-left:18px;color:#c3ccd7}
+ul.lim li{margin:4px 0}
+.layer{display:grid;grid-template-columns:26px 1fr;gap:10px;margin:8px 0}
+.layer .ln{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:6px;height:24px;display:grid;place-items:center;color:var(--accent);font-size:12px}
+.layer b{display:block}
+.empty{color:var(--muted);padding:24px 6px;text-align:center}
+/* 3D + split view */
+#gl{position:absolute;inset:0;display:none}
+#gl canvas{display:block;touch-action:none;cursor:grab}
+#lbl3d{position:absolute;inset:0;pointer-events:none;overflow:hidden;display:none}
+.stage.v3d #cv{display:none}.stage.v3d #gl,.stage.v3d #lbl3d{display:block}
+.stage.vsplit #cv{width:50%!important}.stage.vsplit #gl,.stage.vsplit #lbl3d{display:block;left:50%}
+.stage.vsplit::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line);pointer-events:none}
+@media(max-width:760px){.stage.vsplit #cv{width:100%!important;height:50%!important}.stage.vsplit #gl,.stage.vsplit #lbl3d{left:0;top:50%}.stage.vsplit::after{left:0;right:0;top:50%;bottom:auto;width:auto;height:1px}}
+.l3{position:absolute;left:0;top:0;white-space:nowrap;font-size:11.5px}
+.l3.veh b{display:inline-block;color:#071014;border-radius:6px;padding:0 7px;font-weight:800;box-shadow:0 1px 6px rgba(0,0,0,.5)}
+.l3.veh{display:flex;align-items:center;gap:5px}
+.l3 .tp{font-style:normal;background:#ff5d5d;color:#fff;border-radius:5px;padding:0 5px;font-size:10px;font-weight:700;line-height:17px}
+.l3.dmg{background:rgba(20,8,6,.86);border:1px solid #ff6a3d;color:#ffd7c8;border-radius:6px;padding:1px 7px}
+.l3.dmg[data-sev=scuff],.l3.dmg[data-sev=dent]{border-color:#c9a227;color:#f3e3a6}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:rgba(20,26,34,.9)}
+.seg button{background:none;border:none;padding:3px 10px;font-size:12px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--accent);color:#06201d;font-weight:650}
+.mini select{background:rgba(20,26,34,.9);height:26px;font-size:12px;padding:0 6px;border-radius:8px}
+.hint3d{position:absolute;right:12px;top:44px;font-size:11px;color:var(--muted);background:rgba(20,26,34,.8);border:1px solid var(--line);border-radius:7px;padding:2px 8px;pointer-events:none;display:none}
+.stage.v3d .hint3d,.stage.vsplit .hint3d{display:block}
+@media(max-width:600px){.hint3d{display:none!important}.stage.v3d .legend,.stage.vsplit .legend{display:none}.mini{left:12px;right:12px;justify-content:flex-end;flex-wrap:wrap}}
+.callout{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;color:#e6ebf0}
+/* safety tab */
+.vcard{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.vch{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vch .nm{font-weight:650}
+.st{font-size:11px;border-radius:99px;padding:1px 8px;border:1px solid var(--line);color:#c3ccd7;white-space:nowrap}
+.st.red{border-color:#7a2a2a;background:#3a1414;color:#ffb4b4}.st.amb{border-color:#7a5a1a;background:#33260b;color:#ffd58a}
+.st.grn{border-color:#245a3a;background:#0f2a1c;color:#9ff0bd}
+.bag{font-size:11px;border-radius:6px;padding:1px 7px;border:1px dashed #3a4756;color:var(--muted)}
+.bag.on{border:1px solid #d8dee6;background:#e8edf2;color:#10161c;font-weight:650}
+.parts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.pt{font-size:11px;border-radius:5px;padding:0 6px;background:#1f2731;border-left:3px solid #c9a227}
+.pt[data-s=moderate]{border-left-color:#ff9f43}.pt[data-s=severe]{border-left-color:#ff5d5d}.pt[data-s=crushed]{border-left-color:#ff2d55;background:#2c1418}
+.pt[data-s=scuff]{border-left-color:#5b6672}
+.occ{display:grid;grid-template-columns:minmax(90px,auto) auto 1fr 54px;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:12.5px}
+.occ:first-of-type{border-top:none}
+.occ .seat{color:#dfe5ec}
+.occ .mot{color:var(--muted);font-size:11.5px;line-height:1.3}
+.rbar{height:8px;border-radius:4px;background:#222b35;position:relative;overflow:hidden}
+.rbar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.rv{font-family:var(--mono);font-size:12px;text-align:right}
+.sw{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;border:1px solid var(--line);border-radius:99px;padding:1px 8px 1px 5px;cursor:pointer;user-select:none;white-space:nowrap}
+.sw input{margin:0;accent-color:var(--accent)}
+.sw.off{border-color:#7a2a2a;color:#ffb4b4}
+.cdc{font-family:var(--mono);font-size:11.5px;background:#0e1319;border:1px solid var(--line);border-radius:5px;padding:0 6px;color:#e8ecf1}
+.whatif{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid #2c5f59;background:#0e2321;border-radius:10px;padding:9px 12px;margin:4px 0 12px}
+.whatif b{font-family:var(--mono)}
+footer{max-width:1500px;margin:0 auto;padding:0 20px 28px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brandrow">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3dd6c6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="8" width="10" height="6" rx="1.6" transform="rotate(-18 7.5 11)"/><rect x="12" y="11" width="9.5" height="6" rx="1.6" transform="rotate(14 16.7 14)"/><path d="M12 6.5l.8-2.4M14.6 7.8l2-1.7M10.2 8.2L8 6.6" stroke="#ffb020"/></svg>
+      CrashLab
+    </div>
+    <span class="sub">Free, open-source crash simulation, 3D replay &amp; probabilistic reconstruction</span>
+    <div class="badges"><span class="badge">Python · NumPy</span><span class="badge">no licence fees</span><span class="badge" id="bdBuilt"></span></div>
+  </div>
+  <nav class="stabs" id="stabs" role="tablist" aria-label="Crash scenes"></nav>
+</header>
+
+<main>
+  <section>
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="Top-down crash scene animation"></canvas>
+      <div id="gl" aria-label="3D crash scene"></div><div id="lbl3d"></div>
+      <div class="hint3d">drag rotate · right-drag pan · wheel zoom</div>
+      <div class="hud tl"><h1 id="hTitle"></h1><p id="hSub"></p><div class="chips" id="hTags"></div></div>
+      <div class="hud tr" id="hTime">t = 0.00 s</div>
+      <div class="legend" id="legend"></div>
+      <div class="mini"><div class="seg" role="group" aria-label="View"><button data-view="2d">2D</button><button data-view="3d">3D</button><button data-view="split">Split</button></div>
+        <select id="camSel" aria-label="3D camera"></select><button id="btnReset" title="Reset view (R)">Reset view</button></div>
+    </div>
+    <div class="controls">
+      <div class="crow">
+        <button class="btn" id="bImpact" title="Jump to first impact (E)" aria-label="Jump to first impact">⏮</button>
+        <button class="btn" id="bBack" title="Step back (←)" aria-label="Step back">◀︎</button>
+        <button class="btn primary" id="bPlay" aria-label="Play or pause">Pause</button>
+        <button class="btn" id="bFwd" title="Step forward (→)" aria-label="Step forward">▶︎</button>
+        <div class="scrub"><input type="range" id="scr" min="0" max="1000" value="0" aria-label="Timeline"><div class="ticks" id="ticks"></div></div>
+        <span class="tread" id="tRead">0.00 / 0.00 s</span>
+        <select id="rate" aria-label="Playback speed">
+          <option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option><option value="2">2×</option>
+        </select>
+      </div>
+      <div class="toggles" id="toggles">
+        <label class="tg"><input type="checkbox" id="tgSkid" checked>Skid &amp; yaw marks</label>
+        <label class="tg"><input type="checkbox" id="tgTrail" checked>Trajectories</label>
+        <label class="tg"><input type="checkbox" id="tgPts" checked>Impact points</label>
+        <label class="tg" title="What the investigator finds at the scene: rest positions and marks only"><input type="checkbox" id="tgEvid">Evidence view</label>
+        <label class="tg" title="Colour crushed panels and show damage callouts"><input type="checkbox" id="tgDmg" checked>Damage highlight</label>
+        <label class="tg" title="Crash-test dummies, belts and airbags in the 3D view"><input type="checkbox" id="tgOcc" checked>Occupants</label>
+        <label class="tg" id="tgGhostWrap" hidden title="Rest positions of 36 posterior samples from the reconstruction"><input type="checkbox" id="tgGhost">Posterior rest positions</label>
+      </div>
+    </div>
+    <p class="story" id="story"></p>
+  </section>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="ai" aria-selected="false" id="tabAI" hidden>AI report</button>
+      <button role="tab" data-tab="safety" aria-selected="true">Safety</button>
+      <button role="tab" data-tab="report" aria-selected="false">Impacts</button>
+      <button role="tab" data-tab="live" aria-selected="false">Live</button>
+      <button role="tab" data-tab="recon" aria-selected="false" id="tabRecon">Reconstruction</button>
+      <button role="tab" data-tab="method" aria-selected="false">Method</button>
+    </div>
+    <div class="pane" id="pane"></div>
+  </aside>
+</main>
+<footer>Vehicle parameters are typical class values (the named models only indicate size class), not measured data for specific models. Damage, airbag and injury figures are indicative engineering estimates, not medical or forensic findings. Simulated scenes are illustrative. See the Method tab for validation status and limitations.</footer>
+
+<script>/*__THREE__*/</script>
+<script>/*__SAFETY__*/</script>
+<script>/*__VIEW3D__*/</script>
+<script>
+"use strict";
+const D = /*__DATA__*/null;
+const G = 9.81;
+const SHORT = {rear_end:"Rear-end", tbone:"T-bone", head_on:"Head-on", two_wheeler:"Two-wheeler", fog_pileup:"Fog pile-up", compound:"Compound", auto_topple:"Auto tip-over", cyclist:"Cyclist"};
+const $ = (s, r=document) => r.querySelector(s);
+const fmt = (x, d=1) => (x==null||isNaN(x)) ? "–" : Number(x).toFixed(d);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const S = { i:0, sc:null, t:0, T:1, playing:true, rate:1, drag:false, tab:"safety", hold:0, view:"split",
+            tog:{skid:true, trail:true, pts:true, evid:false, ghost:false, dmg:true, occ:true}, V:{k:1,cx:0,cy:0}, last:0,
+            occ:{}, assess:{}, base:{} };
+const cv = $("#cv"), ctx = cv.getContext("2d");
+let cw = 800, ch = 500, dpr = 1;
+
+/* ---------------------------------------------------------------- scene loading */
+function buildTabs(){
+  const nav = $("#stabs");
+  D.scenes.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.className = "stab"; b.setAttribute("role","tab"); b.title = s.title;
+    b.innerHTML = `<span class="n">${i+1}</span>${esc(SHORT[s.id]||s.title)}`;
+    b.onclick = () => load(i);
+    nav.appendChild(b);
+  });
+}
+function load(i){
+  S.i = i; S.sc = D.scenes[i];
+  const sc = S.sc;
+  S.T = (sc.frames.length-1) * sc.dt; S.t0 = sc.t0 || 0; S.t = S.t0; S.hold = 0; S.playing = true;
+  S.tog.evid = false; $("#tgEvid").checked = false;
+  document.querySelectorAll(".stab").forEach((b, k) => b.setAttribute("aria-selected", k===i));
+  $("#hTitle").textContent = sc.title; $("#hSub").textContent = sc.subtitle;
+  $("#hTags").innerHTML = sc.tags.map(t => `<span class="chip">${esc(t)}</span>`).join("");
+  $("#story").textContent = sc.story;
+  $("#legend").innerHTML = sc.veh.map(v => `<span class="chip"><i class="dot" style="background:${v.spec.color}"></i><b>${esc(v.label)}</b>&nbsp;${esc(v.spec.name)}</span>`).join("");
+  $("#tabAI").hidden = !sc.ai; if(sc.ai && !S.aiSeen){ S.tab = "ai"; S.aiSeen = true; } if(!sc.ai && S.tab==="ai") S.tab = "safety";
+  const hasRecon = !!sc.recon;
+  $("#tgGhostWrap").hidden = !hasRecon; $("#tabRecon").hidden = !hasRecon;
+  if(!hasRecon){ S.tog.ghost = false; $("#tgGhost").checked = false; if(S.tab==="recon") S.tab = "report"; }
+  // timeline ticks
+  $("#ticks").innerHTML = sc.events.map(e => `<div class="tick" data-t="${e.t}" style="left:${(e.t/S.T*100).toFixed(2)}%" title="Impact ${e.n} · ${e.a}–${e.b} · t=${fmt(e.t,2)} s"></div>`).join("");
+  document.querySelectorAll(".tick").forEach(el => el.onclick = () => seek(parseFloat(el.dataset.t) - 0.3));
+  // occupant restraint state for this scene (persisted while switching scenes)
+  if(!S.occ[sc.id]) S.occ[sc.id] = sc.veh.map(v => (v.occupants||[]).map(o => ({...o})));
+  sc.veh.forEach((v, vi) => v.occupants = S.occ[sc.id][vi]);
+  S.base = sc.veh.map(v => (v.occupants||[]).map(o => ({...o})));
+  if(W3Dok){ W3D.load(sc); buildCamSel(); }
+  assessAll();
+  fitView(); renderTabs(); setTab(S.tab); updatePlayBtn();
+}
+function buildCamSel(){
+  const sel = $("#camSel"), cur = W3D.camMode;
+  const opt = [["orbit","Orbit"],["top","Top-down"]];
+  S.sc.veh.forEach((v,i) => { opt.push([`follow:${i}`, `Follow ${v.label}`], [`chase:${i}`, `Chase ${v.label}`]);
+    if(!SAFE.isRider(v.spec) && (v.occupants||[]).length) opt.push([`driver:${i}`, `Driver's eye ${v.label}`]); });
+  sel.innerHTML = opt.map(([k,l]) => `<option value="${k}">${l}</option>`).join("");
+  sel.value = opt.some(o => o[0]===cur) ? cur : "orbit";
+}
+function assessAll(){
+  const sc = S.sc; S.assess = {};
+  const sims = {};
+  sc.veh.forEach((v, vi) => { sims[vi] = (v.occupants||[]).map(o => SAFE.assess(v, o)); });
+  S.assess = sims;
+  if(W3Dok) W3D.setSims(sims);
+}
+function baseRisk(){ // risk with the scene's original restraint settings
+  return S.sc.veh.reduce((a, v, vi) => a + S.base[vi].reduce((b, o) => b + SAFE.assess(v, o).risk.p, 0), 0);
+}
+function fitView(){
+  const v = S.sc.view || [-20,-20,20,20];
+  const k = Math.min(cw/(v[2]-v[0]), ch/(v[3]-v[1])) * 0.95;
+  S.V = {k, cx:(v[0]+v[2])/2, cy:(v[1]+v[3])/2};
+}
+
+/* ---------------------------------------------------------------- pose interpolation */
+function pose(vi, t){
+  const F = S.sc.frames, dt = S.sc.dt, n = F.length-1;
+  let f = Math.max(0, Math.min(n, t/dt));
+  const i = Math.floor(f), j = Math.min(i+1, n), a = f - i;
+  const p = F[i][vi], q = F[j][vi];
+  let d = q[2]-p[2]; d = ((d+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+  return {x:p[0]+(q[0]-p[0])*a, y:p[1]+(q[1]-p[1])*a, psi:p[2]+d*a, v:p[3]+(q[3]-p[3])*a,
+          delta:p[4]+(q[4]-p[4])*a, r:p[5]+(q[5]-p[5])*a, acc:p[6], slide:p[7]};
+}
+function restPose(vi){ const f = S.sc.final[vi]; return {x:f.x,y:f.y,psi:f.psi,v:0,delta:0,r:0,acc:0,slide:S.sc.frames[S.sc.frames.length-1][vi][7]}; }
+
+/* ---------------------------------------------------------------- drawing */
+const X = x => (x - S.V.cx)*S.V.k + cw/2;
+const Y = y => -(y - S.V.cy)*S.V.k + ch/2;
+function rr(c, x, y, w, h, r){ c.beginPath(); c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r); c.lineTo(x+w,y+h-r);
+  c.quadraticCurveTo(x+w,y+h,x+w-r,y+h); c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r); c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath(); }
+function poly(c, pts){ c.beginPath(); pts.forEach((p,i) => i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.closePath(); }
+
+function drawVehicle(v, p, o={}){
+  const s = v.spec, L = s.length, W = s.width, off = s.rect_off, k = S.V.k, kind = s.kind;
+  ctx.save(); ctx.translate(X(p.x), Y(p.y)); ctx.scale(k,-k); ctx.rotate(p.psi);
+  const col = s.color;
+  if(o.ghost){
+    ctx.globalAlpha = o.alpha ?? 0.14; rr(ctx, off-L/2, -W/2, L, W, 0.3); ctx.fillStyle = col; ctx.fill();
+    ctx.globalAlpha = Math.min(1,(o.alpha??0.14)*3); ctx.lineWidth = 1.2/k; ctx.strokeStyle = col; ctx.stroke(); ctx.restore(); return;
+  }
+  if(o.outline){
+    ctx.setLineDash([4/k,3/k]); ctx.lineWidth = 1.6/k; ctx.strokeStyle = "rgba(255,255,255,.85)"; rr(ctx, off-L/2, -W/2, L, W, 0.3); ctx.stroke(); ctx.restore(); return;
+  }
+  const front = off+L/2, rear = off-L/2, braking = p.acc < -2.5;
+  const wheelsTop = (kind==="two-wheeler"||kind==="three-wheeler");
+  const drawWheels = () => s.wheels.forEach(w => { ctx.save(); const sg = Math.sign(w[1]);
+      ctx.translate(w[0], kind==="two-wheeler" ? 0 : w[1] + sg*(wheelsTop?0:0.1)); if(w[2]) ctx.rotate(p.delta);
+      ctx.fillStyle = "#07090c"; const wl = kind==="two-wheeler"?0.66:0.64, ww = kind==="two-wheeler"?0.14:0.24;
+      rr(ctx,-wl/2,-ww/2,wl,ww,0.05); ctx.fill(); ctx.restore(); });
+  if(!wheelsTop) drawWheels();
+  if(kind==="two-wheeler"){
+    drawWheels();
+    ctx.globalAlpha = p.slide ? 0.9 : 1;
+    ctx.setLineDash([3/k,3/k]); ctx.lineWidth = 1/k; ctx.strokeStyle = "rgba(255,255,255,.22)"; rr(ctx, rear, -W/2, L, W, 0.15); ctx.stroke(); ctx.setLineDash([]);
+    rr(ctx, -0.55, -0.17, 1.15, 0.34, 0.16); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 0.05; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.stroke();
+    ctx.lineWidth = 0.07; ctx.strokeStyle = "#cfd6de"; ctx.beginPath(); ctx.moveTo(0.62,-0.36); ctx.lineTo(0.62,0.36); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-0.08,0,0.2,0.33,0,0,7); ctx.fillStyle = "#26303c"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0.02,0,0.15,0,7); ctx.fillStyle = p.slide ? "#ff9d9d" : "#f2f4f7"; ctx.fill();
+    if(p.slide){ ctx.setLineDash([5/k,3/k]); ctx.lineWidth = 1.6/k; ctx.strokeStyle = "#ff5d5d"; rr(ctx, rear, -W/2, L, W, 0.15); ctx.stroke(); }
+    ctx.fillStyle = braking ? "#ff3b3b" : "#7a1d1d"; ctx.fillRect(rear+0.05,-0.12,0.1,0.24);
+    ctx.restore(); return;
+  }
+  // body
+  rr(ctx, rear, -W/2, L, W, Math.min(0.42, W*0.22)); ctx.fillStyle = col; ctx.fill();
+  ctx.lineWidth = 0.06; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.stroke();
+  const glass = "rgba(10,18,28,.84)";
+  if(kind==="car"){
+    const wx0 = off+L*0.10, wx1 = off+L*0.23, rx1 = off-L*0.20, rx0 = off-L*0.31;
+    ctx.fillStyle = "rgba(255,255,255,.14)"; ctx.fillRect(rx1,-W*0.40,wx0-rx1,W*0.80);
+    ctx.fillStyle = glass; poly(ctx,[[wx0,-W*0.42],[wx1,-W*0.35],[wx1,W*0.35],[wx0,W*0.42]]); ctx.fill();
+    poly(ctx,[[rx1,-W*0.40],[rx0,-W*0.35],[rx0,W*0.35],[rx1,W*0.40]]); ctx.fill();
+  } else if(kind==="truck"){
+    const cabX = front-L*0.26;
+    ctx.fillStyle = "rgba(0,0,0,.22)"; rr(ctx, rear+0.1, -W/2+0.1, cabX-rear-0.25, W-0.2, 0.15); ctx.fill();
+    ctx.fillStyle = glass; poly(ctx,[[front-L*0.10,-W*0.40],[front-L*0.045,-W*0.36],[front-L*0.045,W*0.36],[front-L*0.10,W*0.40]]); ctx.fill();
+  } else if(kind==="bus"){
+    ctx.fillStyle = "rgba(255,255,255,.16)"; rr(ctx, rear+0.4, -W*0.38, L-1.7, W*0.76, 0.2); ctx.fill();
+    ctx.fillStyle = glass; poly(ctx,[[front-0.75,-W*0.42],[front-0.3,-W*0.36],[front-0.3,W*0.36],[front-0.75,W*0.42]]); ctx.fill();
+    ctx.fillRect(rear+0.2,-W*0.3,0.18,W*0.6);
+  } else { // three-wheeler
+    ctx.fillStyle = "rgba(0,0,0,.28)"; rr(ctx, rear+0.1, -W*0.42, L*0.58, W*0.84, 0.15); ctx.fill();
+    ctx.fillStyle = glass; poly(ctx,[[front-L*0.36,-W*0.38],[front-L*0.30,-W*0.32],[front-L*0.30,W*0.32],[front-L*0.36,W*0.38]]); ctx.fill();
+    drawWheels();
+  }
+  // lights
+  ctx.fillStyle = "#fff0a8"; ctx.fillRect(front-0.2,-W/2+0.1,0.16,Math.min(0.4,W*0.2)); ctx.fillRect(front-0.2,W/2-0.1-Math.min(0.4,W*0.2),0.16,Math.min(0.4,W*0.2));
+  ctx.fillStyle = braking ? "#ff2d2d" : "#7a1d1d"; const tl = Math.min(0.42,W*0.2);
+  ctx.fillRect(rear+0.04,-W/2+0.1,0.15,tl); ctx.fillRect(rear+0.04,W/2-0.1-tl,0.15,tl);
+  if(braking){ ctx.globalAlpha = .35; ctx.fillStyle = "#ff2d2d"; ctx.fillRect(rear-0.25,-W/2+0.05,0.3,W-0.1); }
+  ctx.restore();
+}
+function drawDamage2D(v, p, t){
+  const sf = v.safety; if(!sf) return;
+  const s = v.spec, L = s.length, W = s.width, off = s.rect_off, k = S.V.k;
+  const dm = (sf.damage||[]).filter(d => t >= d.t && d.depth > .005);
+  const top = sf.toppled && t >= sf.toppled.t;
+  if(!dm.length && !top) return;
+  ctx.save(); ctx.translate(X(p.x), Y(p.y)); ctx.scale(k,-k); ctx.rotate(p.psi);
+  if(S.tog.dmg) dm.forEach(d => {
+    const pr = Math.min(1, (t - d.t)/0.09), dep = Math.max(.07, d.depth*pr);
+    let x0, y0, w, h;
+    if(d.face==="front"||d.face==="rear"){ const hw = Math.min(d.width, W)/2, yc = Math.max(-W/2+hw, Math.min(W/2-hw, d.u*W/2));
+      w = dep; h = 2*hw; y0 = yc-hw; x0 = d.face==="front" ? off+L/2-dep : off-L/2; }
+    else { const hw = Math.min(d.width, L)/2, xc = Math.max(off-L/2+hw, Math.min(off+L/2-hw, off+d.u*L/2));
+      w = 2*hw; h = dep; x0 = xc-hw; y0 = d.face==="left" ? W/2-dep : -W/2; }
+    const sev = {scuff:.35, dent:.5, moderate:.65, severe:.8, crushed:.9}[d.severity] || .5;
+    ctx.fillStyle = `rgba(255,70,40,${sev})`; ctx.fillRect(x0, y0, w, h);
+    ctx.setLineDash([]); ctx.lineWidth = 1.5/k; ctx.strokeStyle = "#ffd0c2"; ctx.strokeRect(x0, y0, w, h);
+  });
+  if(top){ ctx.setLineDash([5/k,3/k]); ctx.lineWidth = 2/k; ctx.strokeStyle = "#ff5d5d"; rr(ctx, off-L/2-.15, -W/2-.15, L+.3, W+.3, .2); ctx.stroke(); }
+  ctx.restore();
+  if(top && S.tog.dmg){ ctx.save(); ctx.font = "700 10px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "#ff8a8a";
+    ctx.fillText("TIPPED OVER", X(p.x), Y(p.y) + Math.max(14, W*k*.5) + 12); ctx.restore(); }
+}
+function drawLabel(v, p){
+  const fs = Math.max(10, Math.min(15, S.V.k*0.9));
+  ctx.save(); ctx.font = `700 ${fs}px ${getComputedStyle(document.body).fontFamily}`; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(8,12,17,.75)"; ctx.fillStyle = "#fff";
+  const x = X(p.x), y = Y(p.y); ctx.strokeText(v.label,x,y); ctx.fillText(v.label,x,y); ctx.restore();
+}
+function draw(){
+  const sc = S.sc; if(!sc) return;
+  const t = S.tog.evid ? S.T : S.t, k = S.V.k;
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cw,ch);
+  ctx.fillStyle = "#0a0e13"; ctx.fillRect(0,0,cw,ch);
+  // faint 10 m grid
+  const gx0 = Math.floor((S.V.cx - cw/2/k)/10)*10, gx1 = S.V.cx + cw/2/k, gy0 = Math.floor((S.V.cy - ch/2/k)/10)*10, gy1 = S.V.cy + ch/2/k;
+  ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,.035)"; ctx.beginPath();
+  for(let x=gx0;x<=gx1;x+=10){ ctx.moveTo(X(x),0); ctx.lineTo(X(x),ch); } for(let y=gy0;y<=gy1;y+=10){ ctx.moveTo(0,Y(y)); ctx.lineTo(cw,Y(y)); } ctx.stroke();
+  // roads
+  sc.road.polys.forEach(pl => { ctx.beginPath(); pl.forEach((p,i) => i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1]))); ctx.closePath(); ctx.fillStyle="#2a2f37"; ctx.fill(); });
+  sc.road.lines.forEach(l => { ctx.beginPath(); l.pts.forEach((p,i) => i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));
+    ctx.setLineDash(l.dash ? l.dash.map(d=>d*k) : []); ctx.lineWidth = Math.max(1, l.w*k); ctx.strokeStyle = l.color; ctx.globalAlpha = .75; ctx.stroke(); ctx.globalAlpha = 1; });
+  ctx.setLineDash([]);
+  // skid marks
+  if(S.tog.skid){
+    ctx.strokeStyle = "rgba(4,5,7,.92)"; ctx.lineWidth = Math.max(1.3, 0.2*k); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    sc.marks.forEach(m => { let on = false; ctx.beginPath();
+      for(const p of m.pts){ if(p[2] > t) break; if(!on){ ctx.moveTo(X(p[0]),Y(p[1])); on = true; } else ctx.lineTo(X(p[0]),Y(p[1])); }
+      if(m.w < 0){ ctx.save(); ctx.strokeStyle = "rgba(170,178,188,.55)"; ctx.setLineDash([2,3]); ctx.lineWidth = Math.max(1.5, .3*k); if(on) ctx.stroke(); ctx.restore(); }
+      else if(on) ctx.stroke(); });
+  }
+  // trajectories
+  if(S.tog.trail && !S.tog.evid){
+    const n = Math.min(sc.frames.length-1, Math.floor(t/sc.dt));
+    sc.veh.forEach((v, vi) => { ctx.beginPath(); for(let i=0;i<=n;i+=2){ const f = sc.frames[i][vi]; i?ctx.lineTo(X(f[0]),Y(f[1])):ctx.moveTo(X(f[0]),Y(f[1])); }
+      ctx.setLineDash([3,5]); ctx.lineWidth = 1.5; ctx.strokeStyle = v.spec.color; ctx.globalAlpha = .6; ctx.stroke(); ctx.globalAlpha = 1; ctx.setLineDash([]); });
+  }
+  // reconstruction overlays
+  if(S.tog.ghost && sc.recon){
+    const R = sc.recon, ia = sc.veh.findIndex(v => v.label===R.a), ib = sc.veh.findIndex(v => v.label===R.b);
+    R.ghosts.forEach(g => { drawVehicle(sc.veh[ia], {x:g[0],y:g[1],psi:g[2]}, {ghost:true, alpha:.07}); drawVehicle(sc.veh[ib], {x:g[3],y:g[4],psi:g[5]}, {ghost:true, alpha:.07}); });
+    drawVehicle(sc.veh[ia], {x:R.obs[0],y:R.obs[1],psi:R.obs[2]}, {outline:true}); drawVehicle(sc.veh[ib], {x:R.obs[3],y:R.obs[4],psi:R.obs[5]}, {outline:true});
+  }
+  // vehicles
+  sc.veh.forEach((v, vi) => { const p = S.tog.evid ? restPose(vi) : pose(vi, t); drawVehicle(v, p); drawDamage2D(v, p, t); drawLabel(v, p); });
+  // impacts
+  sc.events.forEach(e => {
+    const dt = t - e.t, px = X(e.P[0]), py = Y(e.P[1]);
+    if(!S.tog.evid && dt >= 0 && dt < 0.9){
+      const a = 1 - dt/0.9, r = (0.6 + dt*7)*k;
+      const g = ctx.createRadialGradient(px,py,0,px,py,r); g.addColorStop(0,`rgba(255,176,32,${.55*a})`); g.addColorStop(1,"rgba(255,176,32,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = `rgba(255,208,100,${a})`; ctx.beginPath(); ctx.arc(px,py,r*0.8,0,7); ctx.stroke();
+    }
+    if(S.tog.pts && (dt >= 0 || S.tog.evid)){
+      ctx.strokeStyle = "#ffb020"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px-5,py-5); ctx.lineTo(px+5,py+5); ctx.moveTo(px+5,py-5); ctx.lineTo(px-5,py+5); ctx.stroke();
+      ctx.font = "700 10px system-ui"; ctx.fillStyle = "#ffb020"; ctx.textAlign = "left"; ctx.fillText(e.n, px+8, py-6);
+    }
+  });
+  // scale bar
+  let bar = 5; for(const b of [1,2,5,10,20,50]) { if(b*k >= 70){ bar = b; break; } bar = b; }
+  const bx = cw - 16 - bar*k, by = ch - 50;
+  ctx.strokeStyle = "#cfd6de"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx,by-4); ctx.lineTo(bx,by); ctx.lineTo(bx+bar*k,by); ctx.lineTo(bx+bar*k,by-4); ctx.stroke();
+  ctx.fillStyle = "#cfd6de"; ctx.font = "11px ui-monospace,monospace"; ctx.textAlign = "center"; ctx.fillText(bar+" m", bx+bar*k/2, by-8);
+}
+
+/* ---------------------------------------------------------------- panels */
+function renderAI(){
+  const A = S.sc.ai; if(!A){ PANES.ai = mk(""); return; }
+  const I = A.interpret || {}, R = A.report || {};
+  const li = a => (a||[]).map(x => `<li>${esc(typeof x === "string" ? x : JSON.stringify(x))}</li>`).join("");
+  let h = `<h3>AI reconstruction report</h3>
+    <p class="small">Generated ${A.model ? "by <span class='m'>"+esc(A.model)+"</span>" : "without AI (fallback)"} from the officer's PC-Crash export${A.notes?" and notes":""} in ${A.seconds}s.
+    The physics numbers come from the parser and the CrashLab simulation. The AI only classified vehicles and wrote the text.</p>`;
+  if(A.error) h += `<div class="callout" style="border-color:#7a2a2a;background:#2a1212">AI step failed: ${esc(A.error)}. The scene was still built directly from the file.</div>`;
+  if(R.summary) h += `<div class="callout" style="border-color:#2c5f59;background:#0e2321;font-size:13.5px;line-height:1.5">${esc(R.summary)}</div>`;
+  if(R.sequence && R.sequence.length) h += `<h3>Sequence of events</h3><table>${R.sequence.map(x => `<tr><td class="m" style="white-space:nowrap">${esc(x.t||"")}</td><td>${esc(x.text||"")}</td></tr>`).join("")}</table>`;
+  for(const [k, t] of [["impact","Impact"],["damage","Damage"],["occupants","Occupants"],["consistency","Consistency with the file"]])
+    if(R[k]) h += `<h3>${t}</h3><p style="font-size:13px;line-height:1.5;color:#d4dbe3">${esc(R[k])}</p>`;
+  if(I.story) h += `<h3>Scene as described by the input</h3><p style="font-size:13px;line-height:1.5;color:#d4dbe3">${esc(I.story)}</p>`;
+  if(I.timeline && I.timeline.length) h += `<table>${I.timeline.map(x => `<tr><td class="m" style="white-space:nowrap">${esc(x.t||"")}</td><td><b>${esc(x.who||"")}</b> ${esc(x.text||"")}</td></tr>`).join("")}</table>`;
+  if(I.conflicts && I.conflicts.length) h += `<h3>Conflicts between notes and file</h3><ul class="lim">${li(I.conflicts)}</ul>`;
+  h += `<h3>Input as parsed</h3><p class="small">Check these against the PC-Crash file. Every simulated number starts here.</p>
+    <table><tr><th></th><th>Vehicle</th><th>Start</th><th>Mass · L×W×H</th><th>Inputs</th></tr>${(A.inputs||[]).map(r => `<tr><td><b>${esc(r.label)}</b></td><td>${esc(r.name)}<div class="small">${esc(r.cls)} · rec ${esc(r.record||"–")}${r.abs?" · ABS":""}</div></td>
+      <td class="m">${fmt(r.speed,0)} km/h<div class="small">${fmt(r.heading,1)}° · (${fmt(r.x,1)}, ${fmt(r.y,1)})</div></td>
+      <td class="m">${fmt(r.mass,0)} kg<div class="small">${fmt(r.L,2)}×${fmt(r.W,2)}×${fmt(r.H,2)} m · CG ${fmt(r.a,2)} m behind front axle, ${fmt(r.h,2)} m high</div></td>
+      <td class="small">${(r.seq||[]).map(q => `${fmt(q.t0,1)}–${fmt(q.t1,1)} s: ${q.decel>0?"brake "+fmt(q.decel,2)+" m/s²":"no brake"}${Math.abs(q.steer)>0.01?", steer "+fmt(q.steer,1)+"°":""}`).join("<br>") || "–"}</td></tr>`).join("")}</table>`;
+  const occA = (S.sc.veh||[]).flatMap(v => (v.occupants||[]).filter(o => o.assumed).map(o => `${v.label} ${o.seat}`));
+  h += `<h3>Assumptions</h3><ul class="lim">${li(A.checks)}${li(R.assumptions)}${occA.length?`<li>Occupants assumed (not in notes): ${esc(occA.join(", "))}. Toggle belts in the Safety tab.</li>`:""}${(I.vehicles||[]).filter(v => v.airbag_basis).map(v => `<li>Airbags fitted, ${esc(S.sc.veh[v.index] ? S.sc.veh[v.index].label : "")}: ${esc((v.airbags||[]).join(", ")||"none")} (${esc(v.airbag_basis)})</li>`).join("")}</ul>`;
+  const nx = [...(R.next_steps||[]), ...(I.missing||[])];
+  if(nx.length) h += `<h3>What to collect next</h3><ul class="lim">${li([...new Set(nx)])}</ul>`;
+  if(A.warnings && A.warnings.length) h += `<h3>Parser warnings</h3><ul class="lim">${li(A.warnings)}</ul>`;
+  h += `<p class="small">AI-written text can be wrong. Treat it as a draft for the investigating officer, not a finding.</p>`;
+  PANES.ai = mk(h);
+}
+function renderTabs(){ renderAI(); renderSafety(); renderReport(); renderLive(); renderRecon(); renderMethod(); }
+function setTab(t){
+  S.tab = t;
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab===t));
+  const pane = $("#pane"); pane.innerHTML = ""; pane.appendChild(PANES[t].cloneNode(true));
+  if(t==="live") bindLive(); if(t==="recon") drawHeat();
+  pane.scrollTop = 0;
+  if(t==="report") pane.querySelectorAll(".ev").forEach((b,i) => b.onclick = () => seek(S.sc.events[i].t - 0.3));
+  if(t==="safety") bindSafety();
+}
+const PANES = {};
+const mk = html => { const d = document.createElement("div"); d.innerHTML = html; return d; };
+
+function zoneTxt(z){ return z; }
+function renderReport(){
+  const sc = S.sc;
+  const nm = l => sc.veh.find(v => v.label===l);
+  let h = `<h3>Impacts in this scene · ${sc.events.length}</h3><p class="small">Computed by the impulse-momentum model. Click an impact to jump to it. ΔV is the velocity change of each vehicle's centre of gravity, the quantity most closely linked to occupant loading.</p>`;
+  if(!sc.events.length) h += `<div class="empty">No impacts occurred in this scene.</div>`;
+  sc.events.forEach(e => {
+    h += `<button class="ev" aria-label="Jump to impact ${e.n}"><div class="evh"><span class="evn">#${e.n}</span><span class="evt">t = ${fmt(e.t,2)} s</span>
+      <b>${e.a} → ${e.b}</b><span class="evz">${esc(e.zone_a)} / ${esc(e.zone_b)}</span></div>
+      <div class="kv"><span>Closing speed</span><b>${fmt(e.closing_kmh)} km/h</b>
+      <span>Speed before impact</span><b>${e.a} ${fmt(e.speed_a_kmh)} · ${e.b} ${fmt(e.speed_b_kmh)} km/h</b>
+      <span>Velocity change ΔV</span><b>${e.a} ${fmt(e.dv_a_kmh)} · ${e.b} ${fmt(e.dv_b_kmh)} km/h</b>
+      <span>Energy dissipated</span><b>${fmt(e.energy_kj)} kJ</b>
+      ${(e.damage||[]).map((d,k) => `<span>${k?e.b:e.a} damage</span><b>${esc(d.face)} · ${d.severity} · ${fmt(d.depth*100,0)} cm <span class="cdc" title="Collision Deformation Classification (simplified, after SAE J224)">${d.cdc}</span></b>`).join("")}</div></button>`;
+  });
+  h += `<h3>Vehicles</h3>` + sc.veh.map(v => `<div class="vrow" style="grid-template-columns:auto 1fr auto"><i class="dot" style="background:${v.spec.color}"></i><div><b>${esc(v.label)} · ${esc(v.spec.name)}</b> <span class="small">${esc(v.spec.example||"")}</span><div class="small">${esc(v.note)}</div></div><span class="small">${Math.round(v.spec.mass)} kg${v.abs?" · ABS":""}</span></div>`).join("");
+  h += `<p class="small" style="margin-top:10px">Crush depth from Campbell's crush-energy model: the impact's dissipated energy is shared between the two vehicles by structural stiffness, then converted to a crush depth over the contact width. The code next to each damage line is a simplified Collision Deformation Classification (force direction as a clock, area, location, type, extent).</p>`;
+  PANES.report = mk(h);
+}
+const BAGN = {front:"Front", knee:"Knee", side:"Side", curtain:"Curtain"};
+function riskCol(p){ return p < .05 ? "#4ade80" : p < .15 ? "#ffd166" : p < .35 ? "#ff9f43" : "#ff5d5d"; }
+function renderSafety(){
+  const sc = S.sc; let tot = 0;
+  let cards = sc.veh.map((v, vi) => {
+    const s = v.spec, sf = v.safety || {}, A = S.assess[vi] || [];
+    const top = sf.toppled;
+    const fitted = s.airbags || [];
+    const dep = sf.airbags_deployed || [];
+    const bagChips = fitted.length ? fitted.flatMap(ty => { const sides = (ty==="side"||ty==="curtain") ? ["left","right"] : [""];
+        return sides.map(sd => { const d = dep.find(a => a.type===ty && (sd==="" || a.side===sd));
+          return `<span class="bag ${d?"on":""}" title="${d?`deployed at ${fmt(d.t,3)} s${d.rollover?" (rollover sensor)":""}`:"fitted, not deployed"}">${BAGN[ty]}${sd?" "+sd[0].toUpperCase():""}${d?" ✓":""}</span>`; }); }).join(" ")
+      : `<span class="small">${SAFE.isRider(s) ? "No airbags (rider)" : "No airbags fitted"}</span>`;
+    const dm = (sf.damage||[]).filter(d => d.depth > .004);
+    const parts = {};
+    dm.forEach(d => d.parts.forEach(p => { if(!parts[p.name] || parts[p.name].depth < p.depth) parts[p.name] = p; }));
+    const plist = Object.values(parts).sort((a,b) => b.depth - a.depth);
+    const occ = (v.occupants||[]).map((o, k) => {
+      const a = A[k]; if(!a) return "";
+      tot += a.risk.p;
+      const rider = SAFE.isRider(s), key = rider ? "helmet" : "belt", on = !!o[key];
+      const sw = s.style==="auto" && !rider ? `<span class="small">no belts fitted</span>` :
+        `<label class="sw ${on?"":"off"}"><input type="checkbox" data-v="${vi}" data-o="${k}" data-k="${key}" ${on?"checked":""}>${rider?"Helmet":"Belt"}</label>`;
+      let mot = "";
+      if(a.sim){ const m = a.sim; mot = `fwd ${fmt(m.maxX*100,0)} cm · side ${fmt(m.maxY*100,0)} cm`;
+        if(m.contact) mot += `<br><span style="color:#ff9f9f">hits ${esc(m.contact.what)} at ${fmt(m.contact.v,0)} km/h</span>`;
+        if(m.ejected) mot += `<br><span style="color:#ff9f9f">thrown out of the open side</span>`; }
+      else { const pu = (sf.pulses||[])[0]; mot = pu ? `struck at ${fmt(Math.abs(pu.closing),0)} km/h${top?" · thrown, sliding":""}` : "–"; }
+      const pr = a.risk.p;
+      return `<div class="occ"><span class="seat">${esc(o.seat)}</span>${sw}<span class="mot" title="${esc(a.risk.factors.join(" · "))}">${mot}</span>
+        <div><div class="rbar" title="${esc(a.risk.kind)}: ${esc(a.risk.factors.join(" · "))}"><i style="width:${Math.max(3,pr*100)}%;background:${riskCol(pr)}"></i></div><div class="rv">${pr<.01?"<1":fmt(pr*100,0)}%</div></div></div>`;
+    }).join("");
+    const kind = SAFE.isRider(s) ? "fatality risk" : "serious-injury risk (MAIS3+)";
+    return `<div class="vcard"><div class="vch"><i class="dot" style="background:${s.color}"></i><span class="nm">${esc(v.label)} · ${esc(s.name)}</span><span class="small">${esc(s.example||"")}</span></div>
+      <div class="vch" style="margin-top:6px">${top?`<span class="st red">Tipped over at ${fmt(top.t,2)} s</span>`:`<span class="st grn">Upright${sf.max_tilt_deg>3?` · max tilt ${fmt(sf.max_tilt_deg,0)}°`:""}</span>`}
+        ${dm.length?`<span class="st ${["severe","crushed"].includes(sf.severity)?"red":"amb"}">Damage: ${sf.severity} · ${fmt(sf.max_depth*100,0)} cm crush</span>`:`<span class="st grn">No structural damage</span>`}
+        ${dm.map(d => `<span class="cdc" title="Collision Deformation Classification (simplified, after SAE J224): ${d.clock} o'clock, ${d.face}">${d.cdc}</span>`).join(" ")}</div>
+      <div style="margin-top:7px" class="small">Airbags</div><div class="vch" style="margin-top:3px">${bagChips}</div>
+      ${plist.length?`<div style="margin-top:7px" class="small">Damaged parts</div><div class="parts">${plist.map(p => `<span class="pt" data-s="${p.sev}" title="${p.sev} · ~${fmt(p.depth*100,0)} cm">${esc(p.name)}</span>`).join("")}</div>`:""}
+      <div style="margin-top:8px" class="small">Occupants · ${kind}</div>${occ || `<div class="small">none</div>`}</div>`;
+  }).join("");
+  const b = baseRisk();
+  const allOn = sc.veh.every(v => (v.occupants||[]).every(o => SAFE.isRider(v.spec) ? o.helmet : (v.spec.style==="auto" || o.belt)));
+  const changed = sc.veh.some((v, vi) => (v.occupants||[]).some((o, k) => !!o.belt !== !!S.base[vi][k].belt || !!o.helmet !== !!S.base[vi][k].helmet));
+  const h = `<h3>Occupant safety</h3>
+    <div class="whatif"><div><div class="small">Expected seriously injured occupants (sum of risks)</div><b>${fmt(tot,2)}</b> <span class="small">${Math.abs(tot-b)>.005?`(scene as set: ${fmt(b,2)})`:""}</span></div>
+      ${changed ? `<button class="btn" id="btnAll" data-m="reset">Reset to scene</button>` : allOn ? `<span class="small" style="max-width:150px;text-align:right">Everyone here already uses a belt / helmet. Untick one to compare.</span>` : `<button class="btn" id="btnAll" data-m="all">What if all belted &amp; helmeted?</button>`}</div>
+    ${cards}
+    <p class="small">Toggle a belt or helmet to re-run that occupant's crash pulse. Excursion comes from a spring-damper occupant model (belt, airbag, dashboard, door) driven by each impact's ΔV. Risk curves are indicative and anchored to published studies (see Method). They are not a medical prediction.</p>`;
+  PANES.safety = mk(h);
+}
+function bindSafety(){
+  $("#pane").querySelectorAll("input[data-v]").forEach(el => el.onchange = () => {
+    const v = S.sc.veh[+el.dataset.v]; v.occupants[+el.dataset.o][el.dataset.k] = el.checked;
+    assessAll(); renderSafety(); const st = $("#pane").scrollTop; setTab("safety"); $("#pane").scrollTop = st; });
+  const b = $("#btnAll"); if(b) b.onclick = () => {
+    const sc = S.sc; const allOn = b.dataset.m === "reset";
+    sc.veh.forEach((v, vi) => (v.occupants||[]).forEach((o, k) => { if(allOn){ Object.assign(o, S.base[vi][k]); } else { if(SAFE.isRider(v.spec)) o.helmet = true; else if(v.spec.style!=="auto") o.belt = true; } }));
+    assessAll(); renderSafety(); setTab("safety"); };
+}
+function renderLive(){
+  const sc = S.sc;
+  let h = `<h3>Live telemetry</h3>` + sc.veh.map((v,i) => `<div class="vrow"><i class="dot" style="background:${v.spec.color}"></i><span class="nm">${esc(v.label)} <span class="small">${esc(v.spec.name)}</span></span>
+     <span class="big" data-sp="${i}">0<span class="unit">km/h</span></span><span class="sm" data-yr="${i}"></span></div>`).join("");
+  h += `<h3>Speed over time</h3><canvas id="chart"></canvas><p class="small">Cursor follows the timeline. Orange lines are impacts, and the sudden speed changes there are the ΔV in the report. The g value is the smoothed acceleration from the speed trace (negative = slowing).</p>`;
+  PANES.live = mk(h);
+}
+function bindLive(){ drawChart(); updateLive(); }
+function updateLive(){
+  if(S.tab!=="live") return;
+  const t = S.tog.evid ? S.T : S.t;
+  document.querySelectorAll("#pane [data-sp]").forEach(el => { const i = +el.dataset.sp, p = pose(i, t); el.firstChild.nodeValue = fmt(p.v*3.6,0); });
+  document.querySelectorAll("#pane [data-yr]").forEach(el => { const i = +el.dataset.yr, p = pose(i, t); const h = 0.08, a = (pose(i,t+h).v - pose(i,t-h).v)/(2*h)/G; el.textContent = `${fmt(p.r*180/Math.PI,0)}°/s · ${a>=0?"+":""}${fmt(a,2)} g`; });
+  drawChart();
+}
+function drawChart(){
+  const c = $("#chart"); if(!c) return;
+  const w = c.clientWidth, h = c.clientHeight, d = Math.min(devicePixelRatio||1,2); c.width = w*d; c.height = h*d;
+  const g = c.getContext("2d"); g.setTransform(d,0,0,d,0,0); g.clearRect(0,0,w,h);
+  const sc = S.sc, pad = {l:34,r:8,t:8,b:20};
+  let vmax = 0; sc.frames.forEach(f => f.forEach(p => vmax = Math.max(vmax, p[3]*3.6)));
+  vmax = Math.ceil(vmax/20)*20 || 20;
+  const x = t => pad.l + t/S.T*(w-pad.l-pad.r), y = v => h-pad.b - v/vmax*(h-pad.t-pad.b);
+  g.font = "10.5px ui-monospace,monospace"; g.fillStyle = "#93a0b0"; g.strokeStyle = "rgba(255,255,255,.07)"; g.lineWidth = 1; g.textAlign = "right";
+  for(let v=0; v<=vmax; v+=vmax/4){ g.beginPath(); g.moveTo(pad.l,y(v)); g.lineTo(w-pad.r,y(v)); g.stroke(); g.fillText(Math.round(v), pad.l-5, y(v)+3); }
+  g.textAlign = "center"; const step = S.T>12?4:S.T>6?2:1; for(let t=0;t<=S.T;t+=step) g.fillText(t+"s", x(t), h-5);
+  sc.events.forEach(e => { g.strokeStyle = "rgba(255,176,32,.55)"; g.setLineDash([2,3]); g.beginPath(); g.moveTo(x(e.t),pad.t); g.lineTo(x(e.t),h-pad.b); g.stroke(); g.setLineDash([]); });
+  sc.veh.forEach((v,vi) => { g.beginPath(); sc.frames.forEach((f,i) => { const px = x(i*sc.dt), py = y(f[vi][3]*3.6); i?g.lineTo(px,py):g.moveTo(px,py); });
+    g.strokeStyle = v.spec.color; g.lineWidth = 1.8; g.stroke(); });
+  const tx = x(S.tog.evid?S.T:S.t); g.strokeStyle = "#e8ecf1"; g.lineWidth = 1; g.beginPath(); g.moveTo(tx,pad.t); g.lineTo(tx,h-pad.b); g.stroke();
+}
+
+/* ---- reconstruction tab */
+function renderRecon(){
+  const sc = S.sc, R = sc.recon; if(!R){ PANES.recon = mk(""); return; }
+  const sm = R.summary, T = R.truth, a = R.a, b = R.b;
+  const rows = [
+    {k:"v_a", l:`${a} · impact speed`, best:R.best.v_a, spd:true},
+    {k:"v_b", l:`${b} · impact speed`, best:R.best.v_b, spd:true}];
+  if(sm.v0_a) rows.push({k:"v0_a", l:`${a} · speed at brake onset`, spd:true});
+  if(sm.v0_b) rows.push({k:"v0_b", l:`${b} · speed at brake onset`, spd:true});
+  rows.push({k:"mu", l:"Road friction μ", rng:[0.4,0.95], dg:2, best:R.best.mu}, {k:"e", l:"Restitution e", rng:[0,0.5], dg:2, best:R.best.e});
+  let smax = 20; rows.filter(r => r.spd).forEach(r => { const s = sm[r.k]; smax = Math.max(smax, s.p95, s.truth, r.best||0); }); smax = Math.ceil(smax*1.06/20)*20;
+  const pos = (v, r) => { const lo = r.rng?r.rng[0]:0, hi = r.rng?r.rng[1]:smax; return Math.max(0,Math.min(100,(v-lo)/(hi-lo)*100)); };
+  const ticks = []; for(let v=0; v<=smax; v+=20) ticks.push(v);
+  const inside = Object.values(sm).filter(Boolean), nIn = inside.filter(s => s.inside90).length;
+  const dA = Math.abs(R.best.v_a - T.v_imp_a), dB = Math.abs(R.best.v_b - T.v_imp_b);
+  const wA = sm.v_a.p95 - sm.v_a.p5, wB = sm.v_b.p95 - sm.v_b.p5;
+  const wide = Math.max(wA, wB) > 30;
+  let h = `<h3>How fast were they going?</h3>
+  <p>The solver sees only what an investigator finds at the scene: where each vehicle came to rest, the pre-impact skid length${R.skid.a||R.skid.b?"":" (none here)"}, and a road-friction reading. It then tests ${R.N.toLocaleString()} candidate crashes per round (${R.stages} tempering rounds, ${R.seconds} s) and keeps the ones that reproduce the evidence.</p>
+  <div class="verdict"><span class="ic ${nIn===inside.length?"ok":"warn"}">${nIn===inside.length?"✓":"!"}</span><div><b>True value inside the 90% range for ${nIn} of ${inside.length} quantities.</b>
+  <div class="small">A one-number tool (best fit) would report ${a} ${fmt(R.best.v_a,0)} · ${b} ${fmt(R.best.v_b,0)} km/h. The true impact speeds were ${fmt(T.v_imp_a,0)} · ${fmt(T.v_imp_b,0)} km/h (off by ${fmt(dA,0)} · ${fmt(dB,0)}).${wide?" Here the evidence is weak, and the wide range is the honest answer.":""}</div></div></div>
+  <div class="key"><span><i class="k-bar"></i>90% interval</span><span><i class="k-med"></i>median</span><span><i class="k-x"></i>true value</span><span><i class="k-d"></i>single best fit</span></div>
+  <div class="forest"><div class="ax"><span></span><div class="axl">${ticks.map(v => `<span style="left:${v/smax*100}%">${v}</span>`).join("")}</div><span class="small" style="text-align:right">km/h</span></div>`;
+  rows.forEach(r => {
+    const s = sm[r.k]; if(!s) return;
+    if(r.k==="mu"){ h += `<div style="height:8px"></div>`; }
+    const dg = r.dg ?? 0, bl = pos(s.p5,r), br = pos(s.p95,r);
+    h += `<div class="frow"><div class="fl">${esc(r.l)}</div><div class="ft" title="truth ${fmt(s.truth,dg)} · median ${fmt(s.p50,dg)}">
+      <div class="fb" style="left:${bl}%;width:${Math.max(.8,br-bl)}%"></div><div class="fm" style="left:${pos(s.p50,r)}%"></div>
+      <div class="fx" style="left:${pos(s.truth,r)}%"></div>${r.best!=null?`<div class="fd" style="left:${pos(r.best,r)}%"></div>`:""}</div>
+      <div class="fv">${fmt(s.p50,dg)}<small>${fmt(s.p5,dg)}–${fmt(s.p95,dg)}</small></div></div>`;
+  });
+  h += `</div><p class="small">Friction μ and restitution e are also unknowns. Friction has a drag-sled reading (±0.06) as prior, so it is mostly known. Restitution has no measurement, so the posterior stays broad, and that width flows into the speeds.</p>
+  <h3>Which speed pairs fit the evidence?</h3><canvas id="heat"></canvas>
+  <p class="small">Bright = speed pairs that reproduce the rest positions (μ, e at posterior medians). White dots are posterior samples. ${Math.abs(R.corr)>0.5?`The posterior speeds are strongly ${R.corr<0?"negatively":"positively"} correlated (ρ = ${fmt(R.corr,2)}): the evidence pins down the combination of the two speeds better than either alone, which is why one-number answers can mislead.`:`The posterior speeds are only weakly correlated (ρ = ${fmt(R.corr,2)}).`}</p>
+  <h3>Evidence supplied</h3><div class="kv"><span>${a} rest pose</span><b>${fmt(R.obs[0],1)}, ${fmt(R.obs[1],1)} m · ${fmt(R.obs[2]*180/Math.PI,0)}°</b>
+  <span>${b} rest pose</span><b>${fmt(R.obs[3],1)}, ${fmt(R.obs[4],1)} m · ${fmt(R.obs[5]*180/Math.PI,0)}°</b>
+  ${R.skid.a?`<span>${a} skid before impact</span><b>${fmt(R.skid.a,1)} m</b>`:""}${R.skid.b?`<span>${b} skid before impact</span><b>${fmt(R.skid.b,1)} m</b>`:""}
+  <span>Survey error assumed</span><b>±0.25 m, ±2°</b></div>
+  <p class="small" style="margin-top:10px">The evidence is generated from the full simulation plus survey noise, so the true answer is known and the test is whether the method recovers it. It is a check on the inference, not yet on real crashes. Toggle <i>Posterior rest positions</i> to see the fit on the map.</p>`;
+  PANES.recon = mk(h);
+}
+function drawHeat(){
+  const c = $("#heat"); if(!c || !S.sc.recon) return;
+  const R = S.sc.recon, Sf = R.surface, w = c.clientWidth, h = c.clientHeight, d = Math.min(devicePixelRatio||1,2);
+  c.width = w*d; c.height = h*d; const g = c.getContext("2d"); g.setTransform(d,0,0,d,0,0);
+  const pad = {l:42,r:12,t:10,b:36}, pw = w-pad.l-pad.r, ph = h-pad.t-pad.b;
+  const na = Sf.va.length, nb = Sf.vb.length, x0 = Sf.va[0], x1 = Sf.va[na-1], y0 = Sf.vb[0], y1 = Sf.vb[nb-1];
+  const X_ = v => pad.l + (v-x0)/(x1-x0)*pw, Y_ = v => pad.t + ph - (v-y0)/(y1-y0)*ph;
+  const ramp = z => { const st = [[0,[13,18,26]],[.25,[26,62,92]],[.55,[40,160,170]],[.8,[110,225,190]],[1,[255,230,140]]]; z = Math.max(0,Math.min(1,z));
+    for(let i=1;i<st.length;i++) if(z<=st[i][0]){ const a = st[i-1], b = st[i], f = (z-a[0])/(b[0]-a[0]); return `rgb(${a[1].map((v,j)=>Math.round(v+(b[1][j]-v)*f)).join(",")})`; } return "#fff"; };
+  const cwid = pw/(na-1)+1, chh = ph/(nb-1)+1;
+  for(let j=0;j<nb;j++) for(let i=0;i<na;i++){ g.fillStyle = ramp(Math.pow(Sf.z[j][i],0.5)); g.fillRect(X_(Sf.va[i])-cwid/2, Y_(Sf.vb[j])-chh/2, cwid, chh); }
+  g.fillStyle = "rgba(255,255,255,.28)"; R.samples.v_a.forEach((v,i) => { const px = X_(v), py = Y_(R.samples.v_b[i]); if(px>pad.l&&px<pad.l+pw&&py>pad.t&&py<pad.t+ph) g.fillRect(px-1,py-1,2,2); });
+  g.strokeStyle = "#ffb020"; g.lineWidth = 2; const tx = X_(R.truth.v_imp_a), ty = Y_(R.truth.v_imp_b);
+  g.beginPath(); g.moveTo(tx-7,ty); g.lineTo(tx+7,ty); g.moveTo(tx,ty-7); g.lineTo(tx,ty+7); g.stroke();
+  g.fillStyle = "#ff5d5d"; const bx = X_(R.best.v_a), by = Y_(R.best.v_b); g.beginPath(); g.moveTo(bx,by-6); g.lineTo(bx+6,by); g.lineTo(bx,by+6); g.lineTo(bx-6,by); g.closePath(); g.fill();
+  g.strokeStyle = "rgba(255,255,255,.25)"; g.lineWidth = 1; g.strokeRect(pad.l,pad.t,pw,ph);
+  g.fillStyle = "#93a0b0"; g.font = "10.5px ui-monospace,monospace"; g.textAlign = "center";
+  const stp = v => v>160?40:v>80?20:10;
+  for(let v=Math.ceil(x0/stp(x1-x0))*stp(x1-x0); v<=x1; v+=stp(x1-x0)) g.fillText(Math.round(v), X_(v), pad.t+ph+14);
+  g.textAlign = "right"; for(let v=Math.ceil(y0/stp(y1-y0))*stp(y1-y0); v<=y1; v+=stp(y1-y0)) g.fillText(Math.round(v), pad.l-5, Y_(v)+3);
+  g.textAlign = "center"; g.fillText(`${R.a} impact speed (km/h)`, pad.l+pw/2, h-6);
+  g.save(); g.translate(11, pad.t+ph/2); g.rotate(-Math.PI/2); g.fillText(`${R.b} impact speed (km/h)`, 0, 0); g.restore();
+  g.textAlign = "left"; g.fillStyle = "#ffb020"; g.fillText("+ true", pad.l+6, pad.t+13); g.fillStyle = "#ff5d5d"; g.fillText("◆ best fit", pad.l+52, pad.t+13);
+}
+
+/* ---- method tab */
+function renderMethod(){
+  const C = D.calibration, Vd = D.validation;
+  const qn = {v_a:"Impact speed, vehicle 1", v_b:"Impact speed, vehicle 2", mu:"Road friction μ", e:"Restitution e"};
+  let h = `<h3>What is under the hood</h3>
+  <div class="layer"><span class="ln">1</span><div><b>Vehicle + tyres</b><span class="small">Planar rigid body (x, y, heading) with a tyre at each wheel. Each tyre has its own load (with weight transfer in braking and cornering), a slip-angle force that saturates at μ·load, and a sliding mode when the wheel locks, which is what leaves skid marks.</span></div></div>
+  <div class="layer"><span class="ln">2</span><div><b>Impact</b><span class="small">Oriented-rectangle contact finds the overlap, contact point and normal. An impulse conserves linear and angular momentum, with a restitution coefficient and Coulomb friction between the vehicles. Reports ΔV, energy dissipated and impact direction.</span></div></div>
+  <div class="layer"><span class="ln">3</span><div><b>Drivers</b><span class="small">Scripted cruise, late braking (locked or ABS), path-following steering, and a fog driver who reacts one second after seeing the vehicle ahead.</span></div></div>
+  <div class="layer"><span class="ln">4</span><div><b>Reconstruction</b><span class="small">Runs the physics backwards statistically. Thousands of candidate crashes are simulated at once and weighted by how well their rest positions match the evidence (adaptive sequential Monte Carlo). The answer is a range, not one number.</span></div></div>
+  <div class="layer"><span class="ln">5</span><div><b>Tip-over / rollover</b><span class="small">A 1-DOF roll model about the outer wheel line, driven by the sideways tyre force and by the collision impulse acting below or above the centre of gravity. Past the balance angle gravity finishes the tip. A delta tricycle (auto-rickshaw) tips about the line from its front wheel to a rear wheel, so its static stability factor is ~0.46 versus 1.1–1.4 for cars. Two-wheelers fall as an inverted pendulum after impact.</span></div></div>
+  <div class="layer"><span class="ln">6</span><div><b>Damage &amp; crush</b><span class="small">Campbell's linear crush model (F/w = A + B·C). The energy each impact dissipates is split between the vehicles by structural stiffness and converted into a crush depth over the contact width. That maps to named parts, a severity level and a simplified Collision Deformation Classification code (after SAE J224). The 3D body mesh is deformed to that depth.</span></div></div>
+  <div class="layer"><span class="ln">7</span><div><b>Restraints &amp; occupants</b><span class="small">Airbag sensor logic on each vehicle's ΔV (frontal ≥18 km/h within 10–2 o'clock; side/curtain ≥12 km/h lateral; curtains also on tip-over). A spring-damper occupant model (belt with slack, seat, airbags, wheel/dash, door with intrusion) gives excursion and contact speed. Risk curves are anchored to published studies (sources below) and adjusted for belt, airbag, intrusion, ejection and helmet use.</span></div></div>
+  <h3>Verification checks</h3><p class="small">Automated physics checks against analytic results.</p>
+  <table><tr><th>Check</th><th>Result</th></tr>${Vd.map(v => `<tr><td><b>${esc(v.name)}</b><div class="small">${esc(v.detail)}</div></td><td class="m"><span class="${v.ok?"ok":"bad"}">${v.ok?"✓":"✗"}</span> ${esc(v.got)}<div class="small">expected: ${esc(v.expect)}</div></td></tr>`).join("")}</table>`;
+  if(C){
+    const CM = D.calibration_matched, A1 = C.summary, A2 = CM ? CM.summary : null, pct = x => fmt(x*100,0)+"%";
+    h += `<h3>Calibration of the uncertainty ranges</h3><p class="small">Random crashes (random speeds, friction, restitution) were simulated, noisy rest positions generated, and the solver run blind. A trustworthy 90% range should contain the truth about 90% of the time. Two settings: <b>wide</b> (the likelihood allows 0.6 m / 6° of model error, as used in the demos above, n=${A1.v_a.n}) and <b>matched</b> (likelihood width = the true survey noise${A2?`, n=${A2.v_a.n}`:""}).</p>
+    <table><tr><th>Quantity</th><th>Coverage${A2?" wide · matched":""}</th><th>Median error</th><th>Mean 90% width${A2?" wide · matched":""}</th></tr>${Object.keys(qn).map(k => { const sp = (k==="v_a"||k==="v_b"), u = sp?" km/h":"", d = sp?1:2; const E = (A2||A1)[k];
+      return `<tr><td>${qn[k]}</td><td class="m">${pct(A1[k].coverage)}${A2?" · "+pct(A2[k].coverage):""}</td><td class="m">${fmt(E.mae,d)}${u}</td><td class="m">${fmt(A1[k].mean_width,d)}${A2?" · "+fmt(A2[k].mean_width,d):""}${u}</td></tr>`; }).join("")}</table>
+    <p class="small">Coverage far above 90% with the wide setting means the ranges are conservative: safe but wider than the evidence needs. The matched setting shows how much tighter they get, and whether the coverage then falls to about 90%. Both test the inference method on data from the same physics, not the physics against real crashes.</p>`;
+  }
+  if(D.catalogue){
+    h += `<h3>Vehicle library</h3><p class="small">Typical class values (rounded). The named models only indicate the size class; replace with the actual vehicle's data for a real case. SSF = static stability factor (half-track ÷ CG height, tricycle axis for the auto).</p>
+    <table><tr><th>Class</th><th>Mass</th><th>L × W × H (m)</th><th>SSF</th><th>Airbags</th></tr>${D.catalogue.map(c => `<tr><td><b>${esc(c.name)}</b><div class="small">${esc(c.example)}</div></td><td class="m">${Math.round(c.mass)} kg</td><td class="m">${fmt(c.length,2)} × ${fmt(c.width,2)} × ${fmt(c.height,2)}</td><td class="m">${c.ssf?fmt(c.ssf,2):"–"}</td><td class="small">${(c.airbags||[]).join(", ")||"–"}</td></tr>`).join("")}</table>`;
+  }
+  h += `<h3>Sources for the safety models</h3><ul class="lim">
+  <li>Belted car-occupant MAIS3+ risk anchors: Lübbe N. et al. (2024), <i>Accident Analysis &amp; Prevention</i> 202:107586 (~10% MAIS3+ around 70 km/h for modern belted cars in frontal and near-side crashes).</li>
+  <li>Seat belts cut moderate-to-critical injury risk for front-seat occupants by about 50% (NHTSA). Frontal airbags cut driver deaths in frontal crashes by about 29% (NHTSA).</li>
+  <li>Head-protecting side airbags cut driver deaths in driver-side crashes by about 37% (IIHS).</li>
+  <li>Rider/cyclist fatality vs impact speed: Rosén E. &amp; Sander U. (2009), <i>Accident Analysis &amp; Prevention</i> 41(3) (pedestrian curve used as a proxy). Helmet effect: Liu B. et al. (2008), Cochrane review (motorcycle helmets, about 42% lower risk of death).</li>
+  <li>Crush model: Campbell K. (1974), SAE 740565. CDC: SAE J224.</li></ul>`;
+  h += `<h3>Limitations (read before trusting a number)</h3><ul class="lim">
+  <li><b>Not validated against real crashes yet.</b> The next step is replaying public crash-test data (NHTSA, Euro NCAP) and comparing speeds and ΔV.</li>
+  <li><b>Vehicle data are typical class values.</b> A real case needs the actual mass, dimensions and CG height.</li>
+  <li><b>Planar physics, 3D display.</b> The collision physics is planar (rigid bodies, impulse-momentum). Crush depth is computed after the impact from its energy, not fed back into the motion. Roll is a 1-DOF tip model (no tumbling roll-overs, no vaulting over another vehicle). Riders stay with their machine. No pedestrians yet.</li>
+  <li><b>Safety outputs are indicative.</b> Airbag thresholds, crash-pulse durations, the occupant model and the risk curves are generic. They show the direction and size of effects (belt vs no belt, intrusion, tip-over) and are not a forensic or medical assessment.</li>
+  <li><b>Inverse solver uses the first impact only</b> and assumes known contact geometry (normally from damage matching), no yaw at impact and the post-impact driver behaviour.</li>
+  <li><b>Weak evidence gives wide answers.</b> A light motorcycle barely moves a car, so its speed is poorly determined. That is a property of the evidence, not a bug.</li></ul>
+  <h3>Keyboard</h3><p class="small">Space play/pause · ← → step · E first impact · R reset view · V cycle 2D / 3D / split · 2D: wheel zoom, drag pan · 3D: drag rotate, right-drag pan, wheel zoom</p>`;
+  PANES.method = mk(h);
+}
+
+/* ---------------------------------------------------------------- controls */
+function seek(t){ S.t = Math.max(0, Math.min(S.T, t)); S.hold = 0; S.playing = false; updatePlayBtn(); }
+function updatePlayBtn(){ $("#bPlay").textContent = S.playing ? "Pause" : (S.t>=S.T-1e-6 ? "Replay" : "Play"); }
+function resize(){
+  const st = $("#stage").getBoundingClientRect(); dpr = Math.min(window.devicePixelRatio||1, 2);
+  const narrow = innerWidth <= 760, split = S.view === "split";
+  cw = Math.max(120, split && !narrow ? st.width/2 : st.width); ch = Math.max(120, split && narrow ? st.height/2 : st.height);
+  cv.style.width = cw + "px"; cv.style.height = ch + "px"; cv.width = cw*dpr; cv.height = ch*dpr; if(S.sc) fitView();
+  if(W3Dok) W3D.resize();
+  if(S.tab==="recon") drawHeat(); if(S.tab==="live") drawChart();
+}
+function frame(now){
+  const dt = Math.min(0.05, (now - S.last)/1000); S.last = now;
+  if(S.sc && S.playing && !S.drag && !S.tog.evid){
+    if(S.t < S.T){ S.t = Math.min(S.T, S.t + dt*S.rate); }
+    else { S.hold += dt; if(S.hold > 1.4){ S.t = S.t0; S.hold = 0; } }
+  }
+  if(S.sc){
+    const t = S.tog.evid ? S.T : S.t;
+    $("#hTime").textContent = `t = ${t.toFixed(2)} s`; $("#tRead").textContent = `${t.toFixed(2)} / ${S.T.toFixed(2)} s`;
+    if(!S.drag) $("#scr").value = Math.round(t/S.T*1000);
+    if(S.view !== "3d") draw();
+    if(S.view !== "2d" && W3Dok){ const tt = t; W3D.update(tt, (vi, ta) => (S.tog.evid && ta===undefined) ? restPose(vi) : pose(vi, ta===undefined ? tt : ta)); }
+    updateLive();
+  }
+  requestAnimationFrame(frame);
+}
+function bind(){
+  $("#bPlay").onclick = () => { if(S.tog.evid){ S.tog.evid = false; $("#tgEvid").checked = false; S.t = S.t0; S.playing = true; }
+    else { if(S.t>=S.T-1e-6) S.t = S.t0; S.playing = !S.playing; } updatePlayBtn(); };
+  $("#bBack").onclick = () => seek(S.t - S.sc.dt); $("#bFwd").onclick = () => seek(S.t + S.sc.dt);
+  $("#bImpact").onclick = () => { if(S.sc.events.length) seek(S.sc.events[0].t - 0.3); };
+  $("#scr").addEventListener("input", e => { S.drag = true; S.t = +e.target.value/1000*S.T; S.hold = 0; });
+  $("#scr").addEventListener("change", () => { S.drag = false; S.playing = false; updatePlayBtn(); });
+  $("#rate").onchange = e => S.rate = +e.target.value;
+  [["tgSkid","skid"],["tgTrail","trail"],["tgPts","pts"],["tgEvid","evid"],["tgGhost","ghost"]].forEach(([id,k]) => $("#"+id).onchange = e => { S.tog[k] = e.target.checked;
+    if(k==="evid"){ if(e.target.checked) S.playing = false; else { S.t = S.t0; S.playing = true; } updatePlayBtn(); } });
+  $("#btnReset").onclick = () => { fitView(); if(W3Dok) W3D.resetCam(); };
+  document.querySelectorAll(".seg button").forEach(b => b.onclick = () => setView(b.dataset.view));
+  $("#camSel").onchange = e => W3D.setCam(e.target.value);
+  $("#tgDmg").onchange = e => { S.tog.dmg = e.target.checked; if(W3Dok) W3D.setOpts({damage: S.tog.dmg}); };
+  $("#tgOcc").onchange = e => { S.tog.occ = e.target.checked; if(W3Dok) W3D.setOpts({occ: S.tog.occ}); };
+  $("#tgSkid").addEventListener("change", e => W3Dok && W3D.setOpts({skid: e.target.checked}));
+  $("#tgTrail").addEventListener("change", e => W3Dok && W3D.setOpts({trail: e.target.checked}));
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+  // pan / zoom
+  let pan = null;
+  cv.addEventListener("pointerdown", e => { pan = {x:e.clientX, y:e.clientY, cx:S.V.cx, cy:S.V.cy}; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", e => { if(!pan) return; S.V.cx = pan.cx - (e.clientX-pan.x)/S.V.k; S.V.cy = pan.cy + (e.clientY-pan.y)/S.V.k; });
+  cv.addEventListener("pointerup", () => pan = null);
+  cv.addEventListener("wheel", e => { e.preventDefault(); const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+    const wx = (mx-cw/2)/S.V.k + S.V.cx, wy = -(my-ch/2)/S.V.k + S.V.cy; S.V.k = Math.max(1.5, Math.min(120, S.V.k*Math.exp(-e.deltaY*0.0015)));
+    S.V.cx = wx - (mx-cw/2)/S.V.k; S.V.cy = wy + (my-ch/2)/S.V.k; }, {passive:false});
+  document.addEventListener("keydown", e => {
+    if(/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName) && e.key===" ") return;
+    if(e.key===" "){ e.preventDefault(); $("#bPlay").click(); }
+    else if(e.key==="ArrowRight"){ seek(S.t + S.sc.dt); } else if(e.key==="ArrowLeft"){ seek(S.t - S.sc.dt); }
+    else if(e.key==="e"||e.key==="E"){ $("#bImpact").click(); } else if(e.key==="r"||e.key==="R"){ fitView(); if(W3Dok) W3D.resetCam(); }
+    else if(e.key==="v"||e.key==="V"){ const o = ["2d","3d","split"]; setView(o[(o.indexOf(S.view)+1)%3]); }
+  });
+  window.addEventListener("resize", resize);
+}
+
+function setView(v){
+  if(!W3Dok && v !== "2d"){ v = "2d"; }
+  S.view = v; const st = $("#stage");
+  st.classList.toggle("v3d", v==="3d"); st.classList.toggle("vsplit", v==="split");
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.view===v));
+  $("#camSel").style.display = v==="2d" ? "none" : "";
+  if(W3Dok) W3D.setVisible(v !== "2d");
+  resize();
+}
+/* ---------------------------------------------------------------- start */
+let W3Dok = false;
+try { const c = document.createElement("canvas"); if(window.THREE && (c.getContext("webgl2") || c.getContext("webgl"))){ W3D.init($("#gl"), $("#lbl3d")); W3D.setTimeGetter(() => S.t); W3Dok = true; } }
+catch(err){ console.warn("3D view unavailable:", err); W3Dok = false; }
+$("#bdBuilt").textContent = "built " + D.meta.built;
+buildTabs(); bind();
+const q = new URLSearchParams(location.search);
+setView(q.get("view") || (innerWidth >= 1100 ? "split" : "3d"));
+load(Math.max(0, Math.min(D.scenes.length-1, (+q.get("scene")||1)-1)));
+if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches){ S.playing = false; updatePlayBtn(); }
+if(q.has("t")){ S.t = +q.get("t"); S.playing = false; updatePlayBtn(); }
+if(q.get("tab")) setTab(q.get("tab"));
+if(q.get("ghost")){ S.tog.ghost = true; $("#tgGhost").checked = true; }
+if(q.get("evid")){ S.tog.evid = true; $("#tgEvid").checked = true; }
+if(q.get("cam") && W3Dok){ W3D.setCam(q.get("cam")); $("#camSel").value = q.get("cam"); }
+requestAnimationFrame(t => { S.last = t; frame(t); });
+</script>
+</body>
+</html>

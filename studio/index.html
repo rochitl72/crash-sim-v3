@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CrashLab Studio</title>
+<style>
+:root{--bg:#0b0f14;--panel:#121820;--panel2:#18202a;--line:#263240;--ink:#e8edf2;--muted:#8f9bab;--accent:#2ec4b6;--warn:#ffb703;--bad:#ff5d5d;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--line)}
+header b{font-size:18px}header .sub{color:var(--muted);font-size:13px}
+header a{margin-left:auto;color:var(--muted);font-size:13px}
+main{display:grid;grid-template-columns:minmax(320px,440px) 1fr;gap:0;height:calc(100vh - 56px)}
+@media(max-width:900px){main{grid-template-columns:1fr;height:auto}#out{height:80vh}}
+#side{border-right:1px solid var(--line);padding:16px 18px;overflow:auto}
+h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px;font-weight:650}
+h2:first-child{margin-top:0}
+textarea{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px;font:12px/1.4 var(--mono);resize:vertical}
+#txt{height:230px}#notes{height:96px;font-family:inherit;font-size:13px}
+.drop{border:1.5px dashed #34465a;border-radius:10px;padding:10px;text-align:center;color:var(--muted);font-size:12.5px;margin-bottom:8px;cursor:pointer}
+.drop.on{border-color:var(--accent);color:var(--accent);background:#0e2321}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+button{font:inherit;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:7px 12px;cursor:pointer}
+button.pri{background:var(--accent);border-color:var(--accent);color:#06201d;font-weight:700;padding:10px 16px;font-size:14.5px}
+button:disabled{opacity:.55;cursor:wait}
+.small{color:var(--muted);font-size:12px}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:#c8d1db}
+#steps{list-style:none;padding:0;margin:10px 0 0}
+#steps li{padding:5px 0 5px 24px;position:relative;color:var(--muted);font-size:13px}
+#steps li::before{content:"";position:absolute;left:4px;top:10px;width:9px;height:9px;border-radius:50%;border:1.5px solid #3c4a5a}
+#steps li.run{color:var(--ink)}#steps li.run::before{border-color:var(--accent);border-top-color:transparent;animation:sp .8s linear infinite}
+#steps li.ok{color:#bfe8de}#steps li.ok::before{background:var(--accent);border-color:var(--accent)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err{background:#2a1212;border:1px solid #7a2a2a;color:#ffc4c4;border-radius:9px;padding:8px 10px;margin-top:10px;font-size:13px;display:none}
+#cases{display:flex;flex-direction:column;gap:6px}
+.case{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 10px;cursor:pointer}
+.case:hover{border-color:#3a5064}.case b{font-size:13px}.case .small{display:block}
+#out{position:relative;background:#0e141b}
+#out iframe{border:0;width:100%;height:100%;display:block}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);text-align:center;padding:30px}
+#empty b{color:var(--ink);font-size:20px}
+.flow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;font-size:13px}
+.flow span{border:1px solid var(--line);border-radius:99px;padding:3px 11px;background:var(--panel)}
+.key{font-size:11.5px;color:var(--muted);margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+</style>
+</head>
+<body>
+<header><b>CrashLab Studio</b><span class="sub">PC-Crash export → AI scene description → physics reconstruction → 3D replay</span><a href="/demo" target="_blank">Demo scenes ↗</a></header>
+<main>
+<section id="side">
+  <h2>1 · PC-Crash values export</h2>
+  <div class="drop" id="drop">Drop the .txt export here or <u>choose a file</u><input type="file" id="file" accept=".txt,.csv,text/plain" hidden></div>
+  <textarea id="txt" spellcheck="false" placeholder="Vehicle:  Honda City …  Eicher …&#10;START VALUES&#10;Velocity magnitude (v) [km/h]: …"></textarea>
+  <div class="row"><button id="sample">Load sample (City vs Eicher)</button><span class="small" id="len"></span></div>
+  <h2>2 · Officer notes (optional)</h2>
+  <textarea id="notes" placeholder="e.g. NH-16 at night, no street lights. Car driver not wearing seatbelt, 2 rear passengers. Truck parked on the left shoulder without reflective tape. Road dry."></textarea>
+  <div class="row"><label class="chk"><input type="checkbox" id="useai" checked>Use AI (Groq) for the description and report</label></div>
+  <div class="row"><button class="pri" id="go">Reconstruct scene</button></div>
+  <ul id="steps"><li data-s="0">Read the export (parser, exact numbers)</li><li data-s="1">AI reads the scene: vehicle types, airbags, occupants, story</li>
+    <li data-s="2">Simulate: tyres, braking, steering, impact, damage, airbags</li><li data-s="3">AI writes the reconstruction report</li><li data-s="4">Build the 3D case viewer</li></ul>
+  <div class="err" id="err"></div>
+  <h2>Recent cases</h2><div id="cases"><span class="small">none yet</span></div>
+  <p class="key">The AI never supplies physics inputs. Speeds, positions, masses and brake/steer inputs come straight from the file. AI text is a draft for the investigating officer. The API key stays on this computer (.env).</p>
+</section>
+<section id="out">
+  <div id="empty"><b>Paste an export and press Reconstruct</b>
+    <div class="flow"><span>PC-Crash .txt</span>→<span>parser</span>→<span>AI scene reading</span>→<span>CrashLab physics</span>→<span>3D + AI report</span></div>
+    <span class="small">Takes ~10–25 s with AI.</span></div>
+  <iframe id="frame" title="Reconstruction" hidden></iframe>
+</section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const txt = $("#txt");
+const upd = () => $("#len").textContent = txt.value ? `${txt.value.length.toLocaleString()} chars · ${(txt.value.match(/^Vehicle:/gm)||[]).length} vehicle header(s)` : "";
+txt.addEventListener("input", upd);
+$("#sample").onclick = async () => { txt.value = await (await fetch("/api/sample")).text(); upd(); };
+const readFile = f => { const r = new FileReader(); r.onload = () => { txt.value = r.result; upd(); }; r.readAsText(f, "latin1"); };
+$("#drop").onclick = () => $("#file").click();
+$("#file").onchange = e => e.target.files[0] && readFile(e.target.files[0]);
+["dragover","dragenter"].forEach(ev => $("#drop").addEventListener(ev, e => { e.preventDefault(); $("#drop").classList.add("on"); }));
+["dragleave","drop"].forEach(ev => $("#drop").addEventListener(ev, e => { e.preventDefault(); $("#drop").classList.remove("on"); }));
+$("#drop").addEventListener("drop", e => e.dataTransfer.files[0] && readFile(e.dataTransfer.files[0]));
+let timer;
+function steps(k, done){ document.querySelectorAll("#steps li").forEach(li => { const s = +li.dataset.s; li.className = s < k || done ? "ok" : s === k ? "run" : ""; }); }
+function show(id){ const f = $("#frame"); f.hidden = false; $("#empty").style.display = "none"; f.src = "/case/" + id; }
+async function loadCases(){
+  const c = await (await fetch("/api/cases")).json();
+  $("#cases").innerHTML = c.length ? c.map(x => `<div class="case" data-id="${x.id}"><b>${esc(x.title)}</b><span class="small">${esc(x.id)} · ${x.impacts} impact(s)${x.model?" · AI":""}</span></div>`).join("") : '<span class="small">none yet</span>';
+  document.querySelectorAll(".case").forEach(d => d.onclick = () => show(d.dataset.id));
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+$("#go").onclick = async () => {
+  $("#err").style.display = "none"; const ai = $("#useai").checked;
+  if(!txt.value.trim()){ $("#err").textContent = "Paste or drop the PC-Crash export first (or load the sample)."; $("#err").style.display = "block"; return; }
+  $("#go").disabled = true; let k = 0; steps(0);
+  const plan = ai ? [500, 4500, 2500, 7000] : [400, 0, 2500, 0];
+  const tick = () => { if(k < 4){ timer = setTimeout(() => { k++; if(!ai && (k===1||k===3)) k++; steps(k); tick(); }, plan[k] || 300); } };
+  tick();
+  try {
+    const r = await fetch("/api/reconstruct", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({text: txt.value, notes: $("#notes").value, ai})});
+    const j = await r.json(); clearTimeout(timer);
+    if(!r.ok) throw new Error(j.error || r.statusText);
+    steps(5, true); show(j.id); loadCases();
+    if(j.error){ $("#err").textContent = "AI step had a problem (" + j.error + "). The scene was still simulated from the file."; $("#err").style.display = "block"; }
+  } catch(e){ clearTimeout(timer); steps(-1); $("#err").textContent = e.message; $("#err").style.display = "block"; }
+  $("#go").disabled = false;
+};
+loadCases();
+</script>
+</body>
+</html>
